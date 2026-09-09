@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FAFAFA"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- 頂部：標題與連線狀態 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="TSDZ2 Override"
+            android:textAlignment="center"
+            android:textColor="#333333"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="狀態：未連線"
+            android:textAlignment="center"
+            android:textColor="#E53935"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/btnConnect"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="掃描並連線 TSDZ2_SIM" />
+
+        <!-- 模式切換開關 -->
+        <Switch
+            android:id="@+id/switchSimMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="啟用動態物理模擬 (坡度/呼吸感)"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <!-- 區塊 A：物理動態模擬面板 -->
+        <LinearLayout
+            android:id="@+id/layoutSimulation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="#E3F2FD"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="動態模擬參數"
+                android:textColor="#1565C0"
+                android:textStyle="bold" />
+
+            <!-- 目標踏頻 -->
+            <TextView
+                android:id="@+id/tvSimCadence"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="目標踏頻: 80 RPM" />
+            <SeekBar
+                android:id="@+id/sbSimCadence"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="120"
+                android:progress="80" />
+
+            <!-- 坡度模擬 -->
+            <TextView
+                android:id="@+id/tvSimGradient"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="當前坡度: 0 %" />
+            <SeekBar
+                android:id="@+id/sbSimGradient"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="40"
+                android:progress="15" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="左側為下坡 (-15%)，右側為上坡 (+25%)"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- 區塊 B：全手動惡搞面板 -->
+        <LinearLayout
+            android:id="@+id/layoutManual"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="#FFF3E0"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="手動覆寫參數"
+                android:textColor="#E65100"
+                android:textStyle="bold" />
+
+            <!-- 手動踏頻 -->
+            <TextView
+                android:id="@+id/tvManCadence"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="踏頻 (C): 0" />
+            <SeekBar
+                android:id="@+id/sbManCadence"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="120"
+                android:progress="0" />
+
+            <!-- 手動扭力 -->
+            <TextView
+                android:id="@+id/tvManTorque"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="扭力 (T): 120" />
+            <SeekBar
+                android:id="@+id/sbManTorque"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="300"
+                android:progress="0" />
+
+            <!-- 手動車速 -->
+            <TextView
+                android:id="@+id/tvManSpeed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="車速 (S): 25 km/h" />
+            <SeekBar
+                android:id="@+id/sbManSpeed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="60"
+                android:progress="25" />
+
+            <!-- 手動錯誤碼 -->
+            <TextView
+                android:id="@+id/tvManError"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="錯誤碼 (E): 0" />
+            <SeekBar
+                android:id="@+id/sbManError"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="10"
+                android:progress="0" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
