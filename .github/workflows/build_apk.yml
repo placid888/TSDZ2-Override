@@ -20,14 +20,16 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: ⚙️ 產生穩定版 Gradle 環境 (Generate Wrapper)
-      run: gradle wrapper --gradle-version 8.5
+    - name: 🔨 使用 Gradle 8.5 直接編譯 APK
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.5'
 
-    - name: 🔨 編譯 Android APK
+    - name: 🚀 執行打包指令
       run: ./gradlew assembleDebug
 
-    - name: 🚀 上傳 APK 檔案供下載
+    - name: 📦 上傳 APK 檔案供下載
       uses: actions/upload-artifact@v4
       with:
         name: tsdz2-override-app
-        path: app/build/outputs/apk/debug/app-debug.apk
+        path: app/build/outputs/apk/debug/app-debug.apk  
