@@ -161,12 +161,14 @@ class MainActivity : AppCompatActivity() {
 
                 // 3. 齒比與坡度換算車速
                 var activeSpeed = (activeCadence * 0.35f) - (simGradient * 0.5f)
-                if (activeSpeed < 0) activeSpeed = 0f
+                if (activeSpeed < 0f) activeSpeed = 0f
 
                 // 4. 坡度影響溫度
                 val activeTemp = if (simGradient > 10) 65 else 38
 
-                val cmd = String.format("C:%d,T:%d,S:%.1f,H:%d", activeCadence, activeTorque, activeSpeed, activeTemp)
+                // 已修正：加入 P 參數並帶入 simGradient
+                val cmd = String.format("C:%d,T:%d,S:%.1f,H:%d,P:%d", 
+                    activeCadence, activeTorque, activeSpeed, activeTemp, simGradient)
                 sendCommand(cmd)
                 
                 delay(1000) // 每 1 秒刷新發送一次
