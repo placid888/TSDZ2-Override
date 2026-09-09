@@ -13,20 +13,19 @@ import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.*
+import java.util.Locale
 import java.util.UUID
 import kotlin.random.Random
 
 @SuppressLint("MissingPermission")
 class MainActivity : AppCompatActivity() {
 
-    // UI 元件
     private lateinit var tvStatus: TextView
     private lateinit var btnConnect: Button
     private lateinit var switchSimMode: Switch
     private lateinit var layoutSimulation: LinearLayout
     private lateinit var layoutManual: LinearLayout
 
-    // BLE 相關
     private var bluetoothAdapter: BluetoothAdapter? = null
     private var bluetoothGatt: BluetoothGatt? = null
     private var writeCharacteristic: BluetoothGattCharacteristic? = null
@@ -35,16 +34,23 @@ class MainActivity : AppCompatActivity() {
     private val CHAR_UUID = UUID.fromString("0000FFF1-0000-1000-8000-00805F9B34FB")
     private val DEVICE_NAME = "TSDZ2_SIM"
 
-    // 物理引擎協程
+    // 引擎協程
     private var simulationJob: Job? = null
+    private var manualJob: Job? = null
+    
     private var simTargetCadence = 80
-    private var simGradient = 0 // -15 到 25
+    private var simGradient = 0 
+
+    // 手動模式快取變數
+    private var manCadence = 0
+    private var manTorque = 0
+    private var manSpeed = 0
+    private var manError = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 綁定 UI
         tvStatus = findViewById(R.id.tvStatus)
         btnConnect = findViewById(R.id.btnConnect)
         switchSimMode = findViewById(R.id.switchSimMode)
@@ -54,7 +60,6 @@ class MainActivity : AppCompatActivity() {
         val bluetoothManager = getSystemService(BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
 
-        // 要求權限
         requestBlePermissions()
 
         btnConnect.setOnClickListener {
@@ -67,21 +72,23 @@ class MainActivity : AppCompatActivity() {
             startBleScan()
         }
 
-        // 模式切換邏輯
         switchSimMode.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
+                stopManualEngine()
                 layoutManual.visibility = View.GONE
                 layoutSimulation.visibility = View.VISIBLE
                 startSimulationEngine()
             } else {
+                stopSimulationEngine()
                 layoutSimulation.visibility = View.GONE
                 layoutManual.visibility = View.VISIBLE
-                stopSimulationEngine()
+                startManualEngine()
             }
         }
 
         setupManualSliders()
         setupSimulationSliders()
+        startManualEngine() // 預設啟動手動模式心跳
     }
 
     private fun requestBlePermissions() {
@@ -97,8 +104,7 @@ class MainActivity : AppCompatActivity() {
         val scanner = bluetoothAdapter?.bluetoothLeScanner
         scanner?.startScan(object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
-                val deviceName = result.device.name
-                if (deviceName == DEVICE_NAME) {
+                if (result.device.name == DEVICE_NAME) {
                     scanner.stopScan(this)
                     runOnUiThread { tvStatus.text = "狀態：找到裝置，連線中..." }
                     result.device.connectGatt(this@MainActivity, false, gattCallback)
@@ -130,6 +136,11 @@ class MainActivity : AppCompatActivity() {
                 bluetoothGatt = gatt
                 val service = gatt.getService(SERVICE_UUID)
                 writeCharacteristic = service?.getCharacteristic(CHAR_UUID)
+                
+                // ⚠️ 關鍵修正：請求加大 MTU 封包限制，確保坡度 (P) 不會被截斷
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    gatt.requestMtu(128)
+                }
             }
         }
     }
@@ -146,38 +157,47 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // --- 區塊 A：物理引擎 (Coroutine) ---
+    // --- 區塊 A：物理引擎模式 ---
     private fun startSimulationEngine() {
         simulationJob = CoroutineScope(Dispatchers.Default).launch {
             while (isActive) {
-                // 1. 踏頻加入呼吸感 (±2 RPM)
                 var activeCadence = simTargetCadence + Random.nextInt(-2, 3)
-                if (simTargetCadence == 0) activeCadence = 0 // 停止踩踏就不加亂數
+                if (simTargetCadence == 0) activeCadence = 0
 
-                // 2. 坡度計算扭力 (基準120 + 坡度權重)
                 var activeTorque = 120 + (simGradient * 8) + Random.nextInt(-3, 4)
                 if (activeTorque < 120) activeTorque = 120
-                if (activeCadence == 0) activeTorque = 0 // 沒踩就沒扭力
+                if (activeCadence == 0) activeTorque = 0
 
-                // 3. 齒比與坡度換算車速
                 var activeSpeed = (activeCadence * 0.35f) - (simGradient * 0.5f)
                 if (activeSpeed < 0f) activeSpeed = 0f
 
-                // 4. 坡度影響溫度
-                val activeTemp = if (simGradient > 10) 65 else 38
-
-                // 已修正：加入 P 參數並帶入 simGradient
-                val cmd = String.format("C:%d,T:%d,S:%.1f,H:%d,P:%d", 
-                    activeCadence, activeTorque, activeSpeed, activeTemp, simGradient)
+                // 移除不必要的 H 參數，並使用 Locale.US 防止歐洲語系小數點變逗號
+                val cmd = String.format(Locale.US, "C:%d,T:%d,S:%.1f,P:%d", 
+                    activeCadence, activeTorque, activeSpeed, simGradient)
                 sendCommand(cmd)
-                
-                delay(1000) // 每 1 秒刷新發送一次
+                delay(1000)
             }
         }
     }
 
     private fun stopSimulationEngine() {
         simulationJob?.cancel()
+    }
+
+    // --- 區塊 B：手動控制模式 ---
+    private fun startManualEngine() {
+        manualJob = CoroutineScope(Dispatchers.Default).launch {
+            while (isActive) {
+                // ⚠️ 關鍵修正：手動模式也加入 1 秒發送 1 次的防超時心跳
+                val cmd = "C:$manCadence,T:$manTorque,S:$manSpeed,E:$manError"
+                sendCommand(cmd)
+                delay(1000)
+            }
+        }
+    }
+
+    private fun stopManualEngine() {
+        manualJob?.cancel()
     }
 
     private fun setupSimulationSliders() {
@@ -197,7 +217,7 @@ class MainActivity : AppCompatActivity() {
 
         sbGradient.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                simGradient = progress - 15 // 將 0~40 映射為 -15% ~ +25%
+                simGradient = progress - 15
                 tvGradient.text = "當前坡度: $simGradient %"
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -205,7 +225,6 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    // --- 區塊 B：手動惡搞面板 ---
     private fun setupManualSliders() {
         val tvC = findViewById<TextView>(R.id.tvManCadence)
         val sbC = findViewById<SeekBar>(R.id.sbManCadence)
@@ -216,15 +235,22 @@ class MainActivity : AppCompatActivity() {
         val tvE = findViewById<TextView>(R.id.tvManError)
         val sbE = findViewById<SeekBar>(R.id.sbManError)
 
+        manCadence = sbC.progress
+        manTorque = sbT.progress
+        manSpeed = sbS.progress
+        manError = sbE.progress
+
         val manualListener = object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                tvC.text = "踏頻 (C): ${sbC.progress}"
-                tvT.text = "扭力 (T): ${sbT.progress}"
-                tvS.text = "車速 (S): ${sbS.progress} km/h"
-                tvE.text = "錯誤碼 (E): ${sbE.progress}"
+                manCadence = sbC.progress
+                manTorque = sbT.progress
+                manSpeed = sbS.progress
+                manError = sbE.progress
                 
-                // 即時發送無呼吸感的死數值
-                sendCommand("C:${sbC.progress},T:${sbT.progress},S:${sbS.progress},E:${sbE.progress}")
+                tvC.text = "踏頻 (C): $manCadence"
+                tvT.text = "扭力 (T): $manTorque"
+                tvS.text = "車速 (S): $manSpeed km/h"
+                tvE.text = "錯誤碼 (E): $manError"
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
@@ -239,6 +265,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         stopSimulationEngine()
+        stopManualEngine()
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
             bluetoothGatt?.close()
         }
