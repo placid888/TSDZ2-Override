@@ -20,8 +20,8 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: ⚙️ 產生 Gradle 環境 (Generate Wrapper)
-      run: gradle wrapper
+    - name: ⚙️ 產生穩定版 Gradle 環境 (Generate Wrapper)
+      run: gradle wrapper --gradle-version 8.5
 
     - name: 🔨 編譯 Android APK
       run: ./gradlew assembleDebug
